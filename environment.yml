@@ -1,0 +1,24 @@
+name: cosmic_genesis
+channels:
+  - conda-forge
+  - nvidia
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.11
+  - cudatoolkit=12.1
+  - pip
+  - pip:
+      - "jax[cuda12_pip]"    # worldsheet PDE, field equations — XLA→CUDA
+      - jaxlib
+      - torch                # neural CY metric, learned fields
+      - torchvision
+      - cupy-cuda12x         # zero-copy JAX DeviceArray → OpenGL buffer
+      - moderngl             # OpenGL 4.1 — VAO/VBO/shader/framebuffer
+      - pygame               # window, input, clock
+      - PyOpenGL             # glInteropRegisterBuffer (CUDA↔GL)
+      - numpy
+      - scipy
+      - pillow               # font/texture atlas for equation rendering
+      - rich                 # console output
+      - click                # CLI flags (--epoch, --theory, --no-gpu)

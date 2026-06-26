@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+cosmic_gpu/
+*.egg-info/
+dist/
+build/
+jaxlib_gpu.whl
+.jax_cache/
+*.pt
+*.pth
