@@ -422,17 +422,16 @@ def _interact(a, b, state, sound, fx, narrator):
                     sound.play_string_vibration(1, True)
                 return
 
-    elif state.epoch_id == 2 and ep and hasattr(ep,'attempt_interaction'):
-        result_dict = ep.attempt_interaction([a, b])
-        result = InteractionResult(
-            allowed=result_dict.get("allowed", False),
-            products=result_dict.get("products", []),
-            equation=result_dict.get("equation",""),
-            description=result_dict.get("description",""),
-            forbidden_reason=result_dict.get("reason",""),
-            forbidden_law=result_dict.get("law",""),
-            forbidden_equation=result_dict.get("equation",""),
-            fx_type=result_dict.get("fx",""),
+        result = ep.attempt_interaction([a, b])
+        if not isinstance(result, InteractionResult):
+            result = InteractionResult(
+                allowed=result.get("allowed",False) if hasattr(result,"get") else getattr(result,"allowed",False),
+                products=result.get("products",[]) if hasattr(result,"get") else getattr(result,"products",[]),
+                equation=result.get("equation","") if hasattr(result,"get") else getattr(result,"equation",""),
+                forbidden_reason=result.get("reason","") if hasattr(result,"get") else getattr(result,"forbidden_reason",""),
+                forbidden_law=result.get("law","") if hasattr(result,"get") else getattr(result,"forbidden_law",""),
+                forbidden_equation=result.get("equation","") if hasattr(result,"get") else getattr(result,"forbidden_equation",""),
+
         )
 
     elif state.epoch_id == 5 and ep and hasattr(ep,'attempt_interaction'):
