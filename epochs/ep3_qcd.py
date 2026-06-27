@@ -41,6 +41,9 @@ STRING_TENSION_GEV_PER_FM = 0.9   # κ in V(r) = κr
 
 @dataclass
 class ColoredParticle:
+    @property
+    def is_antiquark(self):
+        return "anti" in self.species
     """A quark or gluon in the QCD epoch."""
     species:   str      # 'u_quark','d_quark','gluon', etc.
     colour:    str      # 'red','green','blue','octet_RG', etc.

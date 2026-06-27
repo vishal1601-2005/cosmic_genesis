@@ -185,15 +185,22 @@ class HUD:
 
     def _draw_interaction(self, surf, ir: InteractionResult, W, H):
         lines = []
-        border = self.CT if ir.allowed else self.CR
-        if ir.allowed:
-            lines.append((f"✓  {' + '.join(ir.products) if ir.products else 'interaction'}", self.CT))
-            if ir.equation:    lines.append((ir.equation[:65], self.CW))
-            if ir.description: lines.append((ir.description[:70], self.CS))
+        border = self.CT if getattr(ir,"allowed",True) else self.CR
+        if getattr(ir,"allowed",True):
+            prods = getattr(ir,"products",[]) or []
+            pname = getattr(ir,"product_name",prods[0] if prods else "interaction")
+            lines.append((f"✓  {pname}", self.CT))
+            eq = getattr(ir,"equation","") or getattr(ir,"eq_text","")
+            if eq: lines.append((eq[:65], self.CW))
+            desc = getattr(ir,"description","")
+            if desc: lines.append((desc[:70], self.CS))
         else:
-            lines.append((f"⊗  {ir.forbidden_law[:55]}", self.CR))
-            if ir.forbidden_equation: lines.append((ir.forbidden_equation[:65], self.CW))
-            if ir.description:        lines.append((ir.description[:70], self.CS))
+            law = getattr(ir,"forbidden_law","") or ""
+            lines.append((f"⊗  {law[:55]}", self.CR))
+            feq = getattr(ir,"forbidden_equation","")
+            if feq: lines.append((feq[:65], self.CW))
+            desc = getattr(ir,"description","")
+            if desc: lines.append((desc[:70], self.CS))
         pw, ph = 520, 20 + len(lines)*18
         px, py = (W-pw)//2, H//2 + 60
         self._panel(surf, px, py, pw, ph, border=border)
@@ -281,8 +288,10 @@ class GameState:
 # ══════════════════════════════════════════════════════════════
 def draw_particles_sw(surf, particles, state, W, H, t):
     """Software-rendered particle loop (used when no GPU / for HUD layer)."""
-    half_w = W * 0.42
-    half_h = H * 0.42
+    mx_x = max((abs(getattr(p,"x",1)) for p in particles), default=1.0)
+    sc = max(1.0, mx_x)
+    half_w = W * 0.42 / sc
+    half_h = H * 0.42 / sc
     cx = W//2
     cy = H//2
 
@@ -291,21 +300,14 @@ def draw_particles_sw(surf, particles, state, W, H, t):
         sy = int(cy - getattr(p,"y",0) * half_h)
         if sx < -50 or sx > W+50 or sy < -50 or sy > H+50:
             continue
-        r   = max(6, int(getattr(p,'radius',0.014) * W * 0.8))
+        r = max(4, int(getattr(p,'radius',0.025) * 60))
         col = getattr(p,'color_rgb',(0.75,0.75,0.85))
         ci  = [min(255, int(c*255)) for c in col]
         estr= getattr(p,'emission_str', 2.0)
-        # outer glow
-        for ring in range(3, 0, -1):
-            gr = r + ring * 3
-            gs = pygame.Surface((gr*2+2, gr*2+2), pygame.SRCALPHA)
-            pygame.draw.circle(gs, (*ci, 20*ring), (gr+1,gr+1), gr)
-            surf.blit(gs, (sx-gr-1, sy-gr-1))
-        # solid core
-        pygame.draw.circle(surf, ci, (sx, sy), r)
-        # bright white highlight top-left
-        hw = max(2, r//3)
-        pygame.draw.circle(surf, (255,255,255), (sx-r//4, sy-r//4), hw)
+        # glow + core
+        pygame.draw.circle(surf, tuple(min(255,c+40) for c in ci), (sx,sy), r+4)
+        pygame.draw.circle(surf, tuple(ci), (sx,sy), r)
+        pygame.draw.circle(surf, (255,255,255), (sx,sy), max(2,r//3))
         # Selection
         if getattr(p,'selected',False):
             pulse = int(160 + 80*math.sin(t*7))
@@ -332,31 +334,33 @@ def draw_particles_sw(surf, particles, state, W, H, t):
 #  INTERACTION HANDLING
 # ══════════════════════════════════════════════════════════════
 def pick_particle(pos, state, W, H):
-    half_w = W * 0.42
-    half_h = H * 0.42
+    ep = state.active_epoch
+    if ep and hasattr(ep, 'field'):
+        particles = ep.field
+    elif ep and hasattr(ep, 'get_render_particles'):
+        particles = ep.get_render_particles()
+    else:
+        return None
+    if not particles:
+        return None
+    mx_x = max((abs(getattr(p,'x',1)) for p in particles), default=1.0)
+    sc    = max(1.0, mx_x)
+    half_w = W * 0.42 / sc
+    half_h = H * 0.42 / sc
     cx = W // 2
     cy = H // 2
     mx, my = pos
-    ep = state.active_epoch
-    if ep and hasattr(ep, "field"):
-        particles = ep.field
-    elif ep and hasattr(ep, "get_render_particles"):
-        particles = ep.get_render_particles()
-    else:
-        particles = []
-    best, bd = None, 80
+    best, bd = None, 9999
     for p in particles:
-        sx = cx + getattr(p,"x",0) * half_w
-        sy = cy - getattr(p,"y",0) * half_h
+        sx = cx + getattr(p,'x',0) * half_w
+        sy = cy - getattr(p,'y',0) * half_h
         d  = math.hypot(mx-sx, my-sy)
         if d < bd:
             bd = d; best = p
     return best
-
-
 def handle_click(pos, state, sound, fx, narrator, W, H):
     p = pick_particle(pos, state, W, H)
-    print(f"Click at {pos} -> particle: {getattr(p,'species',None)}")
+    print(f"Click at {pos} -> particle: {type(p).__name__ if p else None} at ({getattr(p,"x",None):.1f},{getattr(p,"y",None):.1f}) " if p else f"Click at {pos} -> None")
     if p is None:
         for s in state.selection:
             s.selected = False
@@ -407,7 +411,7 @@ def _interact(a, b, state, sound, fx, narrator):
         ib = ep.visuals.index(b) if hasattr(ep,'visuals') and b in ep.visuals else -1
         if ia >= 0 and ib >= 0:
             result = ep.attempt_join(ia, ib)
-            if result and not result.is_forbidden:
+            if result and not getattr(result,'is_forbidden',False):
                 sound.play_string_join(state.g_s)
                 fx.add_equation_dissolve(
                     (a.x+b.x)/2, (a.y+b.y)/2,
@@ -445,7 +449,7 @@ def _interact(a, b, state, sound, fx, narrator):
         )
 
     else:
-        from interactions import Particle
+        from physics.interactions import Particle
         wrapped = [Particle(species=getattr(p,'species','proton'),
                             x=getattr(p,'x',0), y=getattr(p,'y',0),
                             energy_GeV=getattr(p,'mass_GeV',1.0))
@@ -460,27 +464,29 @@ def _interact(a, b, state, sound, fx, narrator):
     mx = (getattr(a,'x',0)+getattr(b,'x',0))/2
     my = (getattr(a,'y',0)+getattr(b,'y',0))/2
 
-    if result.allowed:
+    if getattr(result, "allowed", False):
         Q = max(0.1, getattr(result,'energy_released_GeV',0.1)*1000)
-        sound.play_fusion(Q, result.products[0] if result.products else "")
-        fx.add_vertex_flash(mx, my, getattr(a,'color_rgb',(0.5,0.5,1.0)))
-        if result.equation:
-            prod = result.products[0] if result.products else "product"
-            col  = getattr(b,'color_rgb',(0.5,0.8,0.5))
-            fx.add_equation_dissolve(mx, my, result.equation[:55], prod, col)
-        if "helium4" in str(result.products):
+        Q = max(0.1, getattr(result,"energy_released_GeV",0.1)*1000)
+        prods = getattr(result,"products",[]) or []
+        if True:
+            eq = getattr(result,"equation","") or getattr(result,"eq_text","")
+            if eq:
+                prod = getattr(result,"products",[None])[0] if getattr(result,"products",[]) else getattr(result,"product_name","product")
+                col = getattr(b,"color_rgb",(0.5,0.8,0.5))
+                fx.add_equation_dissolve(mx, my, eq[:55], prod, col)
+            fx.add_equation_dissolve(mx, my, eq[:55], prod, col)
             narrator.milestone("first_helium4")
         if "proton" in str(result.products):
             narrator.milestone("first_fusion")
     else:
         rt_map = {"charge":0,"colour":1,"confinement":1,"energy":2,
                   "epoch":3,"baryon":4,"gso":5,"diproton":1}
-        law = result.forbidden_law.lower() if result.forbidden_law else ""
+        law = ""
         rt  = next((v for k,v in rt_map.items() if k in law), 1)
         sound.play_forbidden({0:"charge",1:"confinement",2:"energy",
                                3:"epoch",4:"generic",5:"gso"}.get(rt,"generic"))
-        fx.add_forbidden(mx, my, result.forbidden_reason,
-                         result.forbidden_equation, result.forbidden_law, rt)
+        fx.add_forbidden(mx, my, getattr(result,"forbidden_reason","forbidden"),
+                         getattr(result,"forbidden_equation",""), getattr(result,"forbidden_law",""), rt)
 
 
 # ══════════════════════════════════════════════════════════════
