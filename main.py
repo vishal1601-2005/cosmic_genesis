@@ -318,10 +318,10 @@ def draw_particles_sw(surf, particles, state, W, H, t):
     if ep:
         for ev in getattr(ep,'annihilations',[]) + getattr(ep,'forbidden_events',[]):
             x  = getattr(ev,'x',0); y = getattr(ev,'y',0)
-            sx = int(cx + x*W*scale); sy = int(cy - y*H*scale)
+            sx = int(cx + x*half_w); sy = int(cy - y*half_h)
             al = int(getattr(ev,'alpha',0)*180)
             if al < 5: continue
-            r2 = int(getattr(ev,'radius',0)*W*scale*0.3 + 8)
+            r2 = max(8, int(getattr(ev,"radius",0)*60 + 8))
             if hasattr(ev,'color'):
                 cc = [min(255,int(c*255)) for c in ev.color]
                 pygame.draw.circle(surf,(*cc,al),(sx,sy),r2,1)
