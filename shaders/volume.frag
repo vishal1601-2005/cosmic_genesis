@@ -43,7 +43,7 @@ float hash(vec3 p) {
     return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
 
-float noise3(vec3 p) {
+float noise3v(vec3 p) {
     vec3 i = floor(p), f = fract(p);
     vec3 u = f * f * (3.0 - 2.0 * f);
     return mix(mix(mix(hash(i),           hash(i+vec3(1,0,0)), u.x),
@@ -56,7 +56,7 @@ float noise3(vec3 p) {
 float fbm(vec3 p, int oct) {
     float val = 0.0, amp = 0.5, freq = 1.0;
     for (int i = 0; i < oct; i++) {
-        val  += amp * noise3(p * freq);
+        val  += amp * noise3v(p * freq);
         amp  *= 0.5; freq *= 2.0;
     }
     return val;
@@ -89,7 +89,7 @@ vec2 epoch_density(vec3 p, float t) {
         // Baryogenesis: hot QGP, turbulent, very bright
         d   = fbm(p * 2.0 + t * 0.5, 5) * 1.2;
         d   = smoothstep(0.1, 0.8, d);
-        T_n = 0.85 + 0.15 * noise3(p * 8.0 + t);
+        T_n = 0.85 + 0.15 * noise3v(p * 8.0 + t);
 
     } else if (u_epoch == 3) {
         // QCD: plasma with confinement — stringy filaments

@@ -1,0 +1,5 @@
+f=open("shaders/gbuffer.frag",encoding="utf-8").read() 
+f=f.replace("float noise2(vec2 p)","float noise2x(vec2 p)") 
+f=f.replace("noise2(uv","noise2x(uv") 
+f=f.replace("noise2(p","noise2x(p") 
+open("shaders/gbuffer.frag","w",encoding="utf-8").write(f) 

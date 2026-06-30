@@ -191,8 +191,11 @@ def collect_particles(state) -> list:
 
     if epoch_attr:
         ep = getattr(state, epoch_attr, None)
-        if ep and hasattr(ep, "get_render_particles"):
-            return ep.get_render_particles()
+        if ep is not None:
+            if hasattr(ep, "get_render_particles"):
+                return ep.get_render_particles()
+            if hasattr(ep, "field"):
+                return ep.field
 
     # Fallback: check bbn directly
     if hasattr(state, "bbn") and state.bbn:

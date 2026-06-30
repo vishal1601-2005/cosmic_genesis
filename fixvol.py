@@ -1,0 +1,8 @@
+f=open("shaders/volume.frag",encoding="utf-8").read() 
+f=f.replace("float noise3(vec3 p)","float noise3v(vec3 p)") 
+f=f.replace("noise3(pos","noise3v(pos") 
+f=f.replace("noise3(p ","noise3v(p ") 
+f=f.replace("noise3(p,","noise3v(p,") 
+open("shaders/volume.frag","w",encoding="utf-8").write(f) 
+print("done") 
+print("done") 

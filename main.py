@@ -261,7 +261,14 @@ class GameState:
         self.epoch_id   = epoch_id
         self.engine.epoch = epoch_id
         self.active_epoch = self.get_epoch(epoch_id)
-        self.ep_bbn = self._ep.get(5)
+        self.ep_strings=self._ep.get(0)
+        self.ep_inflation=self._ep.get(1)
+        self.ep_baryogenesis=self._ep.get(2)
+        self.ep_qcd=self._ep.get(3)
+        self.ep_axion=self._ep.get(4)
+        self.ep_bbn=self._ep.get(5)
+        self.ep_recombination=self._ep.get(6)
+        self.ep_structure=self._ep.get(7)
         fx.add_epoch_transition(old, epoch_id)
         sound.play_epoch_transition(old, epoch_id)
         narrator.set_epoch(epoch_id)
@@ -342,7 +349,7 @@ def pick_particle(pos, state, W, H):
     else:
         return None
     if not particles:
-        return None
+        return
     mx_x = max((abs(getattr(p,'x',1)) for p in particles), default=1.0)
     sc    = max(1.0, mx_x)
     half_w = W * 0.42 / sc
@@ -360,7 +367,7 @@ def pick_particle(pos, state, W, H):
     return best
 def handle_click(pos, state, sound, fx, narrator, W, H):
     p = pick_particle(pos, state, W, H)
-    print(f"Click at {pos} -> particle: {type(p).__name__ if p else None} at ({getattr(p,"x",None):.1f},{getattr(p,"y",None):.1f}) " if p else f"Click at {pos} -> None")
+    print("clicked")
     if p is None:
         for s in state.selection:
             s.selected = False
@@ -421,7 +428,8 @@ def _interact(a, b, state, sound, fx, narrator):
                     narrator.milestone("first_graviton")
                     sound.play_string_vibration(1, True)
                 return
-
+            return
+        return
         result = ep.attempt_interaction([a, b])
         if not isinstance(result, InteractionResult):
             result = InteractionResult(
@@ -500,7 +508,7 @@ def main():
     flags = pygame.OPENGL | pygame.DOUBLEBUF | pygame.HWSURFACE if (MGL_OK and not args.no_gpu) else 0
     try:
         if flags:
-            pygame.display.set_mode((W, H), flags, 24)
+            pygame.display.set_mode((0,0), flags|pygame.FULLSCREEN, 24)
             ctx = moderngl.create_context()
             use_gpu = True
         else:
@@ -523,19 +531,35 @@ def main():
     hud      = HUD(W, H)
 
     # GPU renderer
-    renderer = None
-    pbuf     = None
+    renderer=None
+    pbuf=None
+    simple_gpu=None
     if use_gpu and ctx:
         try:
-            from render.renderer import Renderer
-            renderer = Renderer(ctx, W, H)
+            from render.simple_gpu import SimpleGPURenderer
+            simple_gpu=SimpleGPURenderer(ctx,W,H)
+            print("GPU OK")
+        except Exception as e:
+            print("GPU failed:",e)
+    if use_gpu and ctx:
+        try:
+            pass #
+            pass #renderer disabled
             pbuf     = ParticleBuffer(ctx)
         except Exception as e:
-            print(f"[renderer] init failed: {e}")
+            print(f"[renderer disabled]: {e}")
             use_gpu = False
 
     # Init first epoch
-    state.active_epoch = state.get_epoch(args.epoch)
+    state.active_epoch=state.get_epoch(args.epoch)
+    state.ep_strings=state._ep.get(0)
+    state.ep_inflation=state._ep.get(1)
+    state.ep_baryogenesis=state._ep.get(2)
+    state.ep_qcd=state._ep.get(3)
+    state.ep_axion=state._ep.get(4)
+    state.ep_bbn=state._ep.get(5)
+    state.ep_recombination=state._ep.get(6)
+    state.ep_structure=state._ep.get(7)
     narrator.set_epoch(args.epoch)
     sound.set_epoch(args.epoch)
 
@@ -634,24 +658,17 @@ def main():
         ep_cfg  = EPOCHS[state.epoch_id]
         bg      = ep_cfg.get("bg_color", (0.01, 0.01, 0.04))
 
+        if simple_gpu:
+            try:
+                simple_gpu.render(particles,ep_cfg.get("bg_color",(0.01,0.01,0.04)),state.t_total)
+            except Exception as e:
+                print("GPU render:",e)
         screen = pygame.display.get_surface()
         W, H = screen.get_size()
-        screen.fill([int(c*255) for c in bg])
-        # draw starfield
-        import random as _r
-        _r.seed(42)
-        for _ in range(200):
-            sx2 = _r.randint(0,W); sy2 = _r.randint(0,H)
-            br  = _r.randint(80,200)
-            pygame.draw.circle(screen,(br,br,br+20),(sx2,sy2),1)
-        # Always collect fresh particles
-        particles = []
-        ep = state.active_epoch
-        if ep and hasattr(ep, "field"):
-            particles = ep.field
-        elif ep and hasattr(ep, "get_render_particles"):
-            particles = ep.get_render_particles()
-        draw_particles_sw(screen, particles, state, W, H, state.t_total)
+        if not simple_gpu:
+            screen.fill([int(c*255) for c in bg])
+        if not simple_gpu:
+            draw_particles_sw(screen, particles, state, W, H, state.t_total)
 
         # ── HUD (pygame over GL) ──────────────────────────
         hud_surf.fill((0,0,0,0))
